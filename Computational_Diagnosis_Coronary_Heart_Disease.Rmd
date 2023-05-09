@@ -1,5 +1,5 @@
 ---
-title: "STAT 632 Project"
+title: "Application of Logistic Regression Predictive Modeling in the Computational Diagnosis of Coronary Heart Disease"
 author: "James Hopham"
 date: "2023-04-19"
 output: pdf_document
