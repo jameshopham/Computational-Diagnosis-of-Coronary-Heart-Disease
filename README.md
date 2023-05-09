@@ -1,2 +1,398 @@
-# Computational-Diagnosis-of-Coronary-Heart-Disease
-Application of Logistic Regression and Random Forest Predictive Modeling in Computational Diagnosis of Coronary Heart Disease
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(faraway)
+library(pROC)
+library(caret)
+```
+
+```{r}
+#load data
+heart_disease<-read_csv("train.csv")
+
+head(heart_disease)
+
+dim(heart_disease)
+
+#remove na values
+
+heart_disease_final<- na.omit(heart_disease)
+
+dim(heart_disease_final)
+
+head(heart_disease_final)
+```
+
+## Data Processing
+
+```{r}
+table(heart_disease_final$BPMeds)
+
+2839/(2839+88)
+```
+
+```{r}
+table(heart_disease_final$prevalentStroke)
+
+2909/(2909+18)
+```
+
+```{r}
+table(heart_disease_final$diabetes)
+
+2848/(2848+79)
+```
+
+```{r}
+table(heart_disease_final$TenYearCHD)
+```
+
+```{r}
+
+heart_disease_final2 <- heart_disease_final[,-c(1,7,8,10)]
+
+head(heart_disease_final2)
+
+#split into train and test datasets 
+
+set.seed(999) # set seed for reproducibility
+n <- nrow(heart_disease_final2); n
+
+floor<-floor(0.6*n) #round down to nearest integer
+
+# randomly sample 60% of rows for training set
+train <- sample(1:n, floor)
+
+```
+
+```{r}
+#Summary Statistics
+summary(heart_disease_final2)
+```
+
+## Initial Model After Removing 0's from Data
+
+```{r}
+#train initial model including all predictors
+glm_train <- glm(TenYearCHD ~ ., data=heart_disease_final2, subset = train, family = binomial)
+```
+
+significant predictors: age, sex, cigs per day, total cholesterol, sys BP, dia BP, glucose
+
+## Variable Selection
+
+```{r}
+#correct for collinearity among predictors
+
+library(faraway) # to use vif() function
+
+round(vif(glm_train), 2)
+```
+
+## Stepwise Selection
+
+```{r}
+#use step() function to implement backwards stepwise selection using AIC
+
+#specify full model
+glm5 <- glm_train
+
+glm_sel <- step(glm5) #treated as glm() object so cannot use glm_sel for predict function
+
+summary(glm_sel)
+
+AIC(glm5, glm_sel)
+```
+
+## Cross Validation of Initial Logistic Regression Model
+
+```{r}
+# subset data frame for testing observations
+heart_disease_test <- heart_disease_final2[-train, ]
+
+# make predictions for probabilities on test set
+probs_test <- predict(glm_sel, newdata = heart_disease_test, type = "response")
+```
+
+```{r}
+
+length(probs_test)
+
+preds_test <- rep(0, 1171)
+
+preds_test[probs_test > 0.5] <- 1
+
+head(probs_test)
+
+head(preds_test) # everything now binomial 0 or 1
+```
+
+```{r}
+#confusion matrix - tabulates predicted vs actual results 
+
+# make confusion matrix
+tb <- table(prediction = preds_test, actual = heart_disease_test$TenYearCHD)
+
+addmargins(tb) 
+```
+
+```{r}
+#plot ROC Curve
+library(pROC)
+
+roc_obj <- roc(heart_disease_test$TenYearCHD, probs_test)
+
+plot(1 - roc_obj$specificities, roc_obj$sensitivities, type="l",
+     xlab = "1 - Specificity",
+     ylab = "Sensitivity")
+
+# plot red point corresponding tothreshold:
+points(x = 9/1000, y = 20/171, col="red", pch=19)
+abline(0, 1, lty=2) # 1-1 line
+```
+
+```{r}
+auc(roc_obj)
+```
+
+## Diagnostic Plots
+
+```{r}
+#Collinearity
+
+heart_disease_final2<-heart_disease_final2 %>% 
+  mutate(
+    sex_binary= ifelse(sex == "Male", 0, 1)
+  )
+
+pairs(age ~ sex_binary + cigsPerDay + totChol +prevalentHyp + glucose + sysBP +diaBP, data=heart_disease_final2)
+```
+
+## Final Logistic Regression Model
+
+```{r}
+glm_train_remove_final_version3 <- glm(TenYearCHD ~ age + sex + cigsPerDay + totChol +prevalentHyp + glucose + sysBP, data=heart_disease_final2, subset = train, family = binomial)
+
+summary(glm_train_remove_final_version3)
+
+confint(glm_train_remove_final_version3)
+```
+
+## Cross Validation
+
+```{r}
+# subset data frame for testing observations
+heart_disease_test <- heart_disease_final2[-train, ]
+
+# make predictions for probabilities on test set
+probs_test <- predict(glm_train_remove_final_version3, newdata = heart_disease_test, type = "response")
+```
+
+```{r}
+
+length(probs_test)
+
+preds_test <- rep(0, 1171)
+
+preds_test[probs_test > 0.2] <- 1
+
+head(probs_test)
+
+head(preds_test) # everything now binomial 0 or 1
+```
+
+```{r}
+#confusion matrix - tabulates predicted vs actual results 
+
+# make confusion matrix
+tb <- table(prediction = preds_test, actual = heart_disease_test$TenYearCHD)
+
+addmargins(tb) 
+```
+
+```{r}
+#plot ROC Curve
+library(pROC)
+
+roc_obj <- roc(heart_disease_test$TenYearCHD, probs_test)
+
+plot(1 - roc_obj$specificities, roc_obj$sensitivities, type="l",
+     xlab = "1 - Specificity",
+     ylab = "Sensitivity")
+
+# plot red point corresponding to threshold:
+points(x = 232/1000, y = 94/171, col="red", pch=19)
+abline(0, 1, lty=2) # 1-1 line
+```
+
+```{r}
+auc(roc_obj)
+```
+
+## Random Forest
+
+```{r}
+library(tidymodels)
+
+set.seed(364)
+n <- nrow(heart_disease_final2)
+heart_data_parts <- heart_disease_final2 %>%
+  initial_split(prop = 0.6)
+
+train <- heart_data_parts %>% 
+  training()%>%
+  mutate(TenYearCHD = factor(TenYearCHD))
+
+test <- heart_data_parts %>% 
+  testing()%>%
+  mutate(TenYearCHD = factor(TenYearCHD))
+```
+
+```{r}
+
+heart_disease_train_ranger <- rand_forest(trees = 500) %>%
+set_engine("ranger") %>%
+set_mode("classification") %>%
+fit(TenYearCHD ~ age + sex + cigsPerDay + totChol +prevalentHyp + glucose + sysBP, data = train)
+```
+
+```{r}
+predictions<- predict(heart_disease_train_ranger, train)
+```
+
+```{r}
+heart_disease_train_ranger %>%
+  predict(test) %>%
+   bind_cols(test)
+```
+
+```{r}
+heart_disease_train_ranger %>%
+predict(test) %>%
+bind_cols(test) %>%
+metrics(truth = TenYearCHD, estimate = .pred_class)
+```
+
+```{r}
+heart_disease_train_ranger %>%
+predict(test) %>%
+bind_cols(test) %>%
+conf_mat(truth = TenYearCHD, estimate = .pred_class)
+```
+
+```{r}
+heart_disease_train_ranger %>%
+predict(test, type = "prob") %>%
+bind_cols(test) %>%
+roc_curve(TenYearCHD, .pred_0) %>%
+autoplot()
+
+```
+
+```{r}
+roc_auc<- heart_disease_train_ranger %>%
+predict(test, type = "prob") %>%
+bind_cols(test) %>%
+roc_auc(TenYearCHD, .pred_0)
+
+roc_auc
+```
+
+## KNN
+
+```{r}
+library(kknn)
+
+
+heart_disease_knn <- nearest_neighbor(neighbors = 11) %>% 
+  set_engine("kknn") %>%
+  set_mode("classification") %>%
+  fit(TenYearCHD ~ ., data = train)
+```
+
+```{r}
+heart_disease_knn %>%
+  predict(test) %>%
+  bind_cols(test) %>%
+  conf_mat(truth = TenYearCHD, estimate = .pred_class)
+```
+
+```{r}
+heart_disease_knn %>%
+  predict(test, type = "prob") %>%
+  bind_cols(test) %>%
+  roc_curve(TenYearCHD, .pred_0) %>%
+  autoplot() 
+```
+
+```{r}
+heart_disease_knn %>%
+  predict(test, type = "prob") %>%
+  bind_cols(test) %>%
+  roc_auc(TenYearCHD, .pred_0) 
+```
+
+## Decision Tree
+
+```{r}
+heart_disease_xgb <- boost_tree(trees = 20) %>% 
+  set_engine("xgboost") %>%
+  set_mode("classification") %>%
+  fit(TenYearCHD ~ ., data = train)
+```
+
+```{r}
+heart_disease_xgb %>%
+  predict(test) %>%
+  bind_cols(test) %>%
+  conf_mat(truth = TenYearCHD, estimate = .pred_class)
+```
+
+```{r}
+heart_disease_xgb %>%
+  predict(test, type = "prob") %>%
+  bind_cols(test) %>%
+  roc_curve(TenYearCHD, .pred_0) %>%
+  autoplot() 
+```
+
+```{r}
+heart_disease_xgb %>%
+  predict(test, type = "prob") %>%
+  bind_cols(test) %>%
+  roc_auc(TenYearCHD, .pred_0) 
+```
+
+## Naive Bayes
+
+```{r}
+library(discrim)
+heart_disease_nb <- naive_Bayes(Laplace = 1) %>% 
+  set_engine("klaR") %>%
+  set_mode("classification") %>%
+  fit(TenYearCHD ~ age + sex + cigsPerDay + totChol +prevalentHyp + glucose + sysBP, data = train)
+
+```
+
+```{r}
+heart_disease_nb %>%
+  predict(test) %>%
+  bind_cols(test) %>%
+  conf_mat(truth = TenYearCHD, estimate = .pred_class)
+```
+
+```{r}
+heart_disease_nb %>%
+  predict(test, type = "prob") %>%
+  bind_cols(test) %>%
+  roc_curve(TenYearCHD, .pred_0) %>%
+  autoplot() 
+```
+
+```{r}
+heart_disease_nb %>%
+  predict(test, type = "prob") %>%
+  bind_cols(test) %>%
+  roc_auc(TenYearCHD, .pred_0) 
+```
