@@ -1,7 +1,7 @@
 # Computational Diagnosis of Coronary Heart Disease
 <div>
-<img src="ROCFinalLog" width="50%"/>
-<img src="EstimatorP" width="50%"/>
+<img src="images/ROCFinalLog.png" width="50%"/>
+<img src="images/EstimatorP.png" width="75%"/>
 <div/>
 
 ## Project Overview
