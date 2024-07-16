@@ -11,7 +11,7 @@ model development process including validating assumptions, feature selection, a
 monitoring accuracy.  Further testing of machine learning models is also done as
 additional comparisons for propspective quantitative analysis.  
 
-## Project Slides
+## Project Paper
 Here is a link to the project paper:
 
 https://github.com/jameshopham/Computational-Diagnosis-of-Coronary-Heart-Disease/blob/main/CHD_Diagnosis_Project_Abstract.pdf
