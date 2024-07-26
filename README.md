@@ -31,12 +31,17 @@ This project was built with the following technologies:
 
 ## Contact
 
-If you have any questions or suggestions, feel free to reach out to me:
+If you have any questions or suggestions, feel free to reach out to us:
 
-- Connect with me on LinkedIn:
+- Connect with us on LinkedIn:
 
 
 
     <img src="./images/1706388570200.jpeg" alt="James Hopham">
     <br>
     <a href="https://www.linkedin.com/in/james-hopham-2440352a5/" target="_blank">James Hopham</a>
+    <div>
+    <img src="./images/1718304683335.jpeg" alt="Raja Solanki">
+    <br>
+    <a href="https://www.linkedin.com/in/solankiraja/" target="_blank">Raja Solanki</a>
+  </div>
